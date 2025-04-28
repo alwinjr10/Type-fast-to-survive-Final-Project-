@@ -1,0 +1,186 @@
+define narrator = Character("Narrator")
+define girl = Character("Girl")
+
+init python:
+    import time
+
+init:
+    image bg forest = "bg_forest.jpg"
+    image girl = "girl.png"
+    image snake_0 = "snake_far.png"
+    image snake_1 = "snake_medium.png"
+    image snake_attack = "snake_attack.png"
+    image heart_full = "heart_full.png"
+    image heart_empty = "heart_empty.png"
+
+transform fit_screen:
+    xalign 0.5
+    yalign 0.5
+    size (config.screen_width, config.screen_height)
+
+transform right_to_left_0:
+    xalign 2.25
+    yalign 0.5
+    zoom 0.9
+
+transform right_to_left_1:
+    xalign 0.75
+    yalign 0.5
+    zoom 0.9
+
+label start:
+
+    $ correct_count = 0
+    scene bg forest at fit_screen
+    show girl at left:
+        zoom 0.9
+    show snake_0 at right_to_left_0
+
+    narrator "A giant snake is chasing the girl!"
+    narrator "Type fast and accurately to save her!"
+
+    $ phrases = [
+    "Please help me!",
+    "The snake is getting closer",
+    "Type faster, don't stop!",
+    "I believe in you",
+    "Keep going, you're doing great!",
+    "Don't let the snake catch me",
+    "You're my only hope",
+    "It's right behind me",
+    "Ohh no, it's almost near me!",
+    "Somebody please help me!",
+    "Help, this snake is chasing me!",
+    "I hope this snake won't kill me!",
+    "This is it! One mistake and it’s all over!",
+    "Please type faster, I can't run forever!",
+    "The snake is right behind me, please type faster!",
+    "If you stop now, I'm going to be snake food!",
+    "It's catching up! Don’t stop typing no matter what!",
+    "You're the only one who can save me",
+]
+
+
+    $ max_time = 10.0
+    $ snake_stage = 0
+    $ health = 3
+
+label typing_game:
+
+    show screen health_display
+
+    hide snake_0
+    hide snake_1
+
+    if snake_stage == 0:
+        show snake_0 at right_to_left_0
+    elif snake_stage >= 1:
+        show snake_1 at right_to_left_1
+
+    $ phrase = renpy.random.choice(phrases)
+    girl "[phrase]"
+
+    $ countdown_value = "3"
+    show screen countdown_screen
+    pause 1.0
+    $ countdown_value = "2"
+    pause 1.0
+    $ countdown_value = "1"
+    pause 1.0
+    $ countdown_value = "GO!"
+    pause 0.5
+    hide screen countdown_screen
+
+    $ start_time = time.time()
+    $ player_input = ""
+    $ time_taken = 0
+    $ timed_out = False
+
+    show screen live_timer_screen(max_time)
+    $ player_input = renpy.input("Type this EXACTLY:\n" + phrase, length=80)
+    $ end_time = time.time()
+    $ time_taken = end_time - start_time
+    hide screen live_timer_screen
+
+    if player_input is None or player_input.strip() != phrase or time_taken > max_time:
+        $ snake_stage += 1
+        $ health -= 1
+        if health <= 0:
+            hide girl
+            hide snake_0
+            hide snake_1
+
+            show snake_attack at center
+            show girl_dead at left:
+                zoom 0.9
+
+            $ renpy.pause(0.5)
+
+            narrator "You were too slow... The snake caught her."
+
+            $ renpy.pause(1.0)
+            jump game_over
+        else:
+            narrator "Too slow or incorrect! The snake is getting closer!"
+            jump typing_game
+    else:
+        $ correct_count += 1
+        narrator "Well done! You typed in [time_taken:.2f] seconds."
+        if correct_count >= 5:
+            jump win
+        $ max_time = max(2.0, max_time - 0.4)
+        jump typing_game
+
+label win:
+    hide screen health_display
+    narrator "You typed fast enough that you saved her! The snake retreated into the forest. Good job!!! You won!"
+    menu:
+        "Play again?":
+            jump start
+        "Exit":
+            return
+
+label game_over:
+    hide screen health_display
+    narrator "Game Over."
+    menu:
+        "Try again?":
+            jump start
+        "Exit":
+            return
+
+screen health_display():
+    if health >= 1:
+        add "heart_full.png" xpos 0.65 ypos 0.02 zoom 0.5
+    else:
+        add "heart_empty.png" xpos 0.65 ypos 0.02 zoom 0.5
+
+    if health >= 2:
+        add "heart_full.png" xpos 0.75 ypos 0.02 zoom 0.5
+    else:
+        add "heart_empty.png" xpos 0.75 ypos 0.02 zoom 0.5
+
+    if health == 3:
+        add "heart_full.png" xpos 0.85 ypos 0.02 zoom 0.5
+    else:
+        add "heart_empty.png" xpos 0.85 ypos 0.02 zoom 0.5
+
+screen countdown_screen():
+    frame:
+        xalign 0.5
+        yalign 0.5
+        background "#0008"
+        padding (40, 20)
+        text "[countdown_value]" size 100 color "#ff0000" xalign 0.5 yalign 0.5
+
+screen live_timer_screen(duration):
+    default time_left = duration
+
+    timer 0.1 repeat True action SetScreenVariable("time_left", max(0.0, duration - (time.time() - start_time)))
+
+    frame:
+        xalign 0.5
+        yalign 0.05
+        background "#0008"
+        padding (20, 10)
+        text "⏳ Time Left: [time_left:.1f] sec" size 32 color "#ffffff"
